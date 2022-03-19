@@ -42,6 +42,7 @@ walkpgdir(pde_t *pgdir, const void *va, int alloc)
   if(*pde & PTE_P){
     pgtab = (pte_t*)P2V(PTE_ADDR(*pde));
   } else {
+    // No page table at this pde, so make one (if caller didn't forbid it)
     if(!alloc || (pgtab = (pte_t*)kalloc()) == 0)
       return 0;
     // Make sure all those PTE_P bits are zero.
@@ -69,7 +70,7 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
     if((pte = walkpgdir(pgdir, a, 1)) == 0)
       return -1;
     if(*pte & PTE_P)
-      panic("remap");
+      panic("remap"); // means we're trying to map something already mapped
     *pte = pa | perm | PTE_P;
     if(a == last)
       break;
@@ -87,8 +88,8 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 //
 // setupkvm() and exec() set up every page table like this:
 //
-//   0..KERNBASE: user memory (text+data+stack+heap), mapped to
-//                phys memory allocated by the kernel
+//   0x1000..KERNBASE: user memory (text+data+stack+heap), mapped to
+//                     phys memory allocated by the kernel
 //   KERNBASE..KERNBASE+EXTMEM: mapped to 0..EXTMEM (for I/O space)
 //   KERNBASE+EXTMEM..data: mapped to EXTMEM..V2P(data)
 //                for the kernel's instructions and r/o data
@@ -108,7 +109,7 @@ static struct kmap {
   uint phys_end;
   int perm;
 } kmap[] = {
- { (void*)KERNBASE, 0,             EXTMEM,    PTE_W}, // I/O space
+ { (void*)KERNBASE, 0,        EXTMEM,    PTE_W}, // I/O space starts at phys addr 0
  { (void*)KERNLINK, V2P(KERNLINK), V2P(data), 0},     // kern text+rodata
  { (void*)data,     V2P(data),     PHYSTOP,   PTE_W}, // kern data+memory
  { (void*)DEVSPACE, DEVSPACE,      0,         PTE_W}, // more devices
@@ -177,7 +178,7 @@ switchuvm(struct proc *p)
   popcli();
 }
 
-// Load the initcode into address 0 of pgdir.
+// Load the initcode into address 0x1000 of pgdir.
 // sz must be less than a page.
 void
 inituvm(pde_t *pgdir, char *init, uint sz)
@@ -188,7 +189,9 @@ inituvm(pde_t *pgdir, char *init, uint sz)
     panic("inituvm: more than a page");
   mem = kalloc();
   memset(mem, 0, PGSIZE);
-  mappages(pgdir, 0, PGSIZE, V2P(mem), PTE_W|PTE_U);
+  // map the new page at address 0x1000
+  // mappages(pgdir, va, size, pa, perm)
+  mappages(pgdir, (void*)0x1000, PGSIZE, V2P(mem), PTE_W|PTE_U);
   memmove(mem, init, sz);
 }
 
@@ -216,53 +219,53 @@ loaduvm(pde_t *pgdir, char *addr, struct inode *ip, uint offset, uint sz)
   return 0;
 }
 
-// Allocate page tables and physical memory to grow process from oldsz to
-// newsz, which need not be page aligned.  Returns new size or 0 on error.
+// Allocate page tables and physical memory to grow process from oldvlimit to
+// newvlimit, which need not be page aligned.  Returns new size or 0 on error.
 int
-allocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+allocuvm(pde_t *pgdir, uint vbase, uint oldvlimit, uint newvlimit)
 {
   char *mem;
   uint a;
 
-  if(newsz >= KERNBASE)
+  if(newvlimit >= KERNBASE)
     return 0;
-  if(newsz < oldsz)
-    return oldsz;
+  if(newvlimit < oldvlimit)
+    return oldvlimit;
 
-  a = PGROUNDUP(oldsz);
-  for(; a < newsz; a += PGSIZE){
+  a = PGROUNDUP(oldvlimit);
+  for(; a < newvlimit; a += PGSIZE){
     mem = kalloc();
     if(mem == 0){
       cprintf("allocuvm out of memory\n");
-      deallocuvm(pgdir, newsz, oldsz);
+      deallocuvm(pgdir, newvlimit, oldvlimit);
       return 0;
     }
     memset(mem, 0, PGSIZE);
     if(mappages(pgdir, (char*)a, PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
       cprintf("allocuvm out of memory (2)\n");
-      deallocuvm(pgdir, newsz, oldsz);
+      deallocuvm(pgdir, newvlimit, oldvlimit);
       kfree(mem);
       return 0;
     }
   }
-  return newsz;
+  return newvlimit;
 }
 
-// Deallocate user pages to bring the process size from oldsz to
-// newsz.  oldsz and newsz need not be page-aligned, nor does newsz
-// need to be less than oldsz.  oldsz can be larger than the actual
-// process size.  Returns the new process size.
+// Deallocate user pages to bring the process vlimit from oldvlimit to
+// newvlimit.  oldvlimit and newvlimit need not be page-aligned, nor
+// does newvlimit need to be less than oldvlimit.  oldvlimit can be larger
+// than the actual process size.  Returns the new process size.
 int
-deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
+deallocuvm(pde_t *pgdir, uint oldvlimit, uint newvlimit)
 {
   pte_t *pte;
   uint a, pa;
 
-  if(newsz >= oldsz)
-    return oldsz;
+  if(newvlimit >= oldvlimit)
+    return oldvlimit;
 
-  a = PGROUNDUP(newsz);
-  for(; a  < oldsz; a += PGSIZE){
+  a = PGROUNDUP(newvlimit);
+  for(; a  < oldvlimit; a += PGSIZE){
     pte = walkpgdir(pgdir, (char*)a, 0);
     if(!pte)
       a = PGADDR(PDX(a) + 1, 0, 0) - PGSIZE;
@@ -275,7 +278,7 @@ deallocuvm(pde_t *pgdir, uint oldsz, uint newsz)
       *pte = 0;
     }
   }
-  return newsz;
+  return newvlimit;
 }
 
 // Free a page table and all the physical memory pages
@@ -313,7 +316,7 @@ clearpteu(pde_t *pgdir, char *uva)
 // Given a parent process's page table, create a copy
 // of it for a child.
 pde_t*
-copyuvm(pde_t *pgdir, uint sz)
+copyuvm(pde_t *pgdir, uint vbase, uint vlimit)
 {
   pde_t *d;
   pte_t *pte;
@@ -322,7 +325,7 @@ copyuvm(pde_t *pgdir, uint sz)
 
   if((d = setupkvm()) == 0)
     return 0;
-  for(i = 0; i < sz; i += PGSIZE){
+  for(i = PGSIZE; i < vlimit; i += PGSIZE){
     if((pte = walkpgdir(pgdir, (void *) i, 0)) == 0)
       panic("copyuvm: pte should exist");
     if(!(*pte & PTE_P))

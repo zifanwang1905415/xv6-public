@@ -129,7 +129,8 @@ userinit(void)
   if((p->pgdir = setupkvm()) == 0)
     panic("userinit: out of memory?");
   inituvm(p->pgdir, _binary_initcode_start, (int)_binary_initcode_size);
-  p->sz = PGSIZE;
+  p->vbase = 0;
+  p->vlimit = PGSIZE;
   memset(p->tf, 0, sizeof(*p->tf));
   p->tf->cs = (SEG_UCODE << 3) | DPL_USER;
   p->tf->ds = (SEG_UDATA << 3) | DPL_USER;
@@ -158,18 +159,18 @@ userinit(void)
 int
 growproc(int n)
 {
-  uint sz;
+  uint vlimit;
   struct proc *curproc = myproc();
 
-  sz = curproc->sz;
+  vlimit = curproc->vlimit;
   if(n > 0){
-    if((sz = allocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((vlimit = allocuvm(curproc->pgdir, curproc->vbase, vlimit, vlimit + n)) == 0)
       return -1;
   } else if(n < 0){
-    if((sz = deallocuvm(curproc->pgdir, sz, sz + n)) == 0)
+    if((vlimit = deallocuvm(curproc->pgdir, vlimit, vlimit + n)) == 0)
       return -1;
   }
-  curproc->sz = sz;
+  curproc->vlimit = vlimit;
   switchuvm(curproc);
   return 0;
 }
@@ -190,13 +191,14 @@ fork(void)
   }
 
   // Copy process state from proc.
-  if((np->pgdir = copyuvm(curproc->pgdir, curproc->sz)) == 0){
+  if((np->pgdir = copyuvm(curproc->pgdir, curproc->vbase, curproc->vlimit)) == 0){
     kfree(np->kstack);
     np->kstack = 0;
     np->state = UNUSED;
     return -1;
   }
-  np->sz = curproc->sz;
+  np->vbase = curproc->vbase;
+  np->vlimit = curproc->vlimit;
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
