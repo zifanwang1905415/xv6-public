@@ -63,6 +63,10 @@ mappages(pde_t *pgdir, void *va, uint size, uint pa, int perm)
 {
   char *a, *last;
   pte_t *pte;
+#ifdef TRACE_MAPPAGES
+  cprintf("mappages for pgdir %p, va %p, size 0x%x, pa 0x%x, perm %x\n",
+       pgdir, va, size, pa, perm);
+#endif
 
   a = (char*)PGROUNDDOWN((uint)va);
   last = (char*)PGROUNDDOWN(((uint)va) + size - 1);
