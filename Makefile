@@ -81,6 +81,10 @@ CFLAGS += $(shell $(CC) -fno-stack-protector -E -x c /dev/null >/dev/null 2>&1 &
 ASFLAGS := -m32 -gdwarf-2 -Wa,-divide
 # FreeBSD ld wants ``elf_i386_fbsd''
 LDFLAGS += -m $(shell $(LD) -V | grep elf_i386 2>/dev/null | head -n 1)
+# uncommenting may help with debugging
+# CFLAGS += -save-temps
+# enable link map (HACK: it's nasty/unusual that LDFLAGS are given directly to ld)
+LDFLAGS += -Map=$@.map
 
 # Disable PIE when possible (for Ubuntu 16.10 toolchain)
 ifneq ($(shell $(CC) -dumpspecs 2>/dev/null | grep -e '[^f]no-pie'),)
@@ -234,11 +238,11 @@ qemu-nox: fs.img xv6.img
 	sed "s/localhost:1234/localhost:$(GDBPORT)/" < $^ > $@
 
 qemu-gdb: fs.img xv6.img .gdbinit
-	@echo "*** Now run 'gdb'." 1>&2
+	@echo "*** Now run 'gdb', in a separate terminal, *from this directory*." 1>&2
 	$(QEMU) -serial mon:stdio $(QEMUOPTS) -S $(QEMUGDB)
 
 qemu-nox-gdb: fs.img xv6.img .gdbinit
-	@echo "*** Now run 'gdb'." 1>&2
+	@echo "*** Now run 'gdb', in a separate terminal, *from this directory*." 1>&2
 	$(QEMU) -nographic $(QEMUOPTS) -S $(QEMUGDB)
 
 # CUT HERE
