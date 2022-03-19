@@ -176,6 +176,7 @@ mkfs: mkfs.c fs.h
 
 UPROGS := \
 	_cat\
+	_nullderef\
 	_echo\
 	_forktest\
 	_grep\
