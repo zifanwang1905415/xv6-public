@@ -19,7 +19,8 @@ fetchint(uint addr, int *ip)
 {
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->vlimit || addr+4 > curproc->vlimit)
+  if(addr >= curproc->vlimit || addr+4 > curproc->vlimit
+    || addr < curproc->vbase || addr+4 <= curproc->vbase)
     return -1;
   *ip = *(int*)(addr);
   return 0;
@@ -34,7 +35,7 @@ fetchstr(uint addr, char **pp)
   char *s, *ep;
   struct proc *curproc = myproc();
 
-  if(addr >= curproc->vlimit)
+  if(addr >= curproc->vlimit || addr < curproc->vbase)
     return -1;
   *pp = (char*)addr;
   ep = (char*)curproc->vlimit;
@@ -63,7 +64,8 @@ argptr(int n, char **pp, int size)
  
   if(argint(n, &i) < 0)
     return -1;
-  if(size < 0 || (uint)i >= curproc->vlimit || (uint)i+size > curproc->vlimit)
+  if(size < 0 || (uint)i >= curproc->vlimit || (uint)i+size > curproc->vlimit
+    || (uint)i < curproc->vbase || (uint)i+size <= curproc->vbase)
     return -1;
   *pp = (char*)i;
   return 0;

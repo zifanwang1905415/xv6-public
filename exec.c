@@ -42,8 +42,8 @@ exec(char *path, char **argv)
     goto bad;
 
   // Load program into memory.
-  vbase = 0;
-  vlimit = 0;
+  vbase = PGSIZE;  // base==limit => process vm is empty...
+  vlimit = PGSIZE; // ... take care to ensure allocuvm doesn't alloc page 0
   for(i=0, off=elf.phoff; i<elf.phnum; i++, off+=sizeof(ph)){
     if(readi(ip, (char*)&ph, off, sizeof(ph)) != sizeof(ph))
       goto bad;
@@ -67,7 +67,7 @@ exec(char *path, char **argv)
   // Allocate two pages at the next page boundary.
   // Make the first inaccessible.  Use the second as the user stack.
   vlimit = PGROUNDUP(vlimit);
-  vbase = 0;
+  vbase = PGSIZE;
   if((vlimit = allocuvm(pgdir, vbase, vlimit, vlimit + 2*PGSIZE)) == 0)
     goto bad;
   clearpteu(pgdir, (char*)(vlimit - 2*PGSIZE));
