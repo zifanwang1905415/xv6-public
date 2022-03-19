@@ -141,6 +141,11 @@ kernelmemfs: $(MEMFSOBJS) entry.o entryother initcode kernel.ld fs.img
 	$(OBJDUMP) -S kernelmemfs > kernelmemfs.asm
 	$(OBJDUMP) -t kernelmemfs | sed '1,/SYMBOL TABLE/d; s/ .* / /; /^$$/d' > kernelmemfs.sym
 
+# use depfiles to ensure rebuilds are triggered on changes to .h files
+CFLAGS += -MMD
+DEPS := $(foreach f,$(wildcard *.c),$(basename $(f)).d)
+-include $(DEPS)
+
 tags: $(OBJS) entryother.S _init
 	etags *.S *.c
 
