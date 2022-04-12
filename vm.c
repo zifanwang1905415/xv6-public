@@ -409,24 +409,24 @@ mprotect(void *addr, int len)
   struct proc *proc = myproc();
   int i;
 
-  //check
+  //check if the address is in the range
   if(len * PGSIZE + (int)addr > proc->vlimit||len <= 0)
   {
     cprintf("Error in Length \n");
     return -1;
   }
 
-  //check
+  //check page-alined != 0
   if((int)(((int) addr) % PGSIZE) != 0)
   {
     cprintf("Error in Address: %p \n", addr);
     return -1;
   }
 
-  //
-  for (i = (int) addr; i < ((len) * PGSIZE+(int) addr); i += PGSIZE)
+  //Return the address of the PTE. if alloc!=0, create a required page table pages.
+  for (i = 0; i < len; i ++)
   {
-    p = walkpgdir(proc->pgdir, (void*) i, 0);
+    p = walkpgdir(proc->pgdir, addr+i*PGSIZE, 0);
     *p = (*p) & (~PTE_W);
   }
 
