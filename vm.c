@@ -441,8 +441,8 @@ munprotect(void *addr, int len)
 {
 
   struct proc *proc = myproc();
-  pte_t *p2;
-  int i2;
+  pte_t *pp;
+  int k;
 
   //check
   if(len * PGSIZE +(int)addr > proc->vlimit||len <= 0)
@@ -459,10 +459,10 @@ munprotect(void *addr, int len)
   }
 
   //
-  for (i2 = (int) addr; i2 < ((len) * PGSIZE+(int) addr); i2 += PGSIZE)
+  for (k = (int) addr; k < ((len) * PGSIZE+(int) addr); k += PGSIZE)
   {
-    p2 = walkpgdir(proc->pgdir, (void*) i2, 0);
-    *p2 = (*p2) | (PTE_W);
+    pp = walkpgdir(proc->pgdir, (void*) k, 0);
+    *pp = (*pp) | (PTE_W);
   }
 
   lcr3(V2P(proc->pgdir));
