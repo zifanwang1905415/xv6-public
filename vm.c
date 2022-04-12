@@ -399,3 +399,74 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 //PAGEBREAK!
 // Blank page.
 
+
+
+int
+mprotect(void *addr, int len)
+{
+
+  pte_t *p;
+  struct proc *proc = myproc();
+  int i;
+
+  //check
+  if(len * PGSIZE + (int)addr > proc->vlimit||len <= 0)
+  {
+    cprintf("Error in Length \n");
+    return -1;
+  }
+
+  //check
+  if((int)(((int) addr) % PGSIZE) != 0)
+  {
+    cprintf("Error in Address: %p \n", addr);
+    return -1;
+  }
+
+  //
+  for (i = (int) addr; i < ((len) * PGSIZE+(int) addr); i += PGSIZE)
+  {
+    p = walkpgdir(proc->pgdir, (void*) i, 0);
+    *p = (*p) & (~PTE_W);
+  }
+
+  lcr3(V2P(proc->pgdir));
+
+  return 0;
+}
+
+
+int
+munprotect(void *addr, int len)
+{
+
+  struct proc *proc = myproc();
+  pte_t *p2;
+  int i2;
+
+  //check
+  if(len * PGSIZE +(int)addr > proc->vlimit||len <= 0)
+  {
+    cprintf("Error in Length \n");
+    return -1;
+  }
+
+  //check
+  if((int)(((int) addr) % PGSIZE) != 0)
+  {
+    cprintf("Error in Address: %p \n", addr);
+    return -1;
+  }
+
+  //
+  for (i2 = (int) addr; i2 < ((len) * PGSIZE+(int) addr); i2 += PGSIZE)
+  {
+    p2 = walkpgdir(proc->pgdir, (void*) i2, 0);
+    *p2 = (*p2) | (PTE_W);
+  }
+
+  lcr3(V2P(proc->pgdir));
+
+  return 0;
+}
+

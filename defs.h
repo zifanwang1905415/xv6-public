@@ -24,6 +24,7 @@ void            consoleintr(int(*)(void));
 void            panic(char*) __attribute__((noreturn));
 int             cps(void);
 
+
 // exec.c
 int             exec(char*, char**);
 
@@ -187,6 +188,8 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 void            clearpteu(pde_t *pgdir, char *uva);
+int             mprotect(void *addr, int len);
+int             munprotect(void *addr, int len);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
