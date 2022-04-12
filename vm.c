@@ -400,7 +400,7 @@ copyout(pde_t *pgdir, uint va, void *p, uint len)
 // Blank page.
 
 
-
+//this is a fixed version, seems work
 int
 mprotect(void *addr, int len)
 {
@@ -435,7 +435,7 @@ mprotect(void *addr, int len)
   return 0;
 }
 
-
+//this is the first version, seems work
 int
 munprotect(void *addr, int len)
 {
